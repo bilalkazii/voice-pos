@@ -22,6 +22,19 @@ class SaleWithCount {
   final int itemCount;
 }
 
+/// One aggregated top-selling row (historical product identity + name).
+class TopSellingRow {
+  const TopSellingRow({
+    required this.productId,
+    required this.productName,
+    required this.quantitySold,
+  });
+
+  final int productId;
+  final String productName;
+  final int quantitySold;
+}
+
 @DriftAccessor(tables: [Sales, SaleItems])
 class SaleDao extends DatabaseAccessor<AppDatabase> with _$SaleDaoMixin {
   SaleDao(super.db);
@@ -150,6 +163,122 @@ class SaleDao extends DatabaseAccessor<AppDatabase> with _$SaleDaoMixin {
     return (selectOnly(sales)..addColumns([sales.id.count()]))
         .map((row) => row.read(sales.id.count()) ?? 0)
         .getSingle();
+  }
+
+  /// One-shot sales summary for a half-open date range
+  /// (`created_at >= start AND created_at < end`), computed in SQLite.
+  /// Returns total paise and transaction count; no sale rows are loaded
+  /// into Dart.
+  Future<({int totalSalesPaise, int transactionCount})> getSalesSummary({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final total = sales.totalPaise.sum();
+    final count = sales.id.count();
+    final row = await (selectOnly(sales)
+          ..addColumns([total, count])
+          ..where(
+            sales.createdAt.isBiggerOrEqualValue(start) &
+                sales.createdAt.isSmallerThanValue(end),
+          ))
+        .getSingle();
+    return (
+      totalSalesPaise: row.read(total) ?? 0,
+      transactionCount: row.read(count) ?? 0,
+    );
+  }
+
+  /// Reactive sales summary for a half-open date range — updates live when
+  /// a new sale commits, so the dashboard refreshes without a restart.
+  Stream<({int totalSalesPaise, int transactionCount})> watchSalesSummary({
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final total = sales.totalPaise.sum();
+    final count = sales.id.count();
+    return (selectOnly(sales)
+          ..addColumns([total, count])
+          ..where(
+            sales.createdAt.isBiggerOrEqualValue(start) &
+                sales.createdAt.isSmallerThanValue(end),
+          ))
+        .watchSingle()
+        .map(
+          (row) => (
+            totalSalesPaise: row.read(total) ?? 0,
+            transactionCount: row.read(count) ?? 0,
+          ),
+        );
+  }
+
+  /// Top-selling products for a half-open date range, aggregated in SQLite:
+  /// group by the historical product identity + snapshot name, sum quantity,
+  /// order by sold desc then name asc (deterministic ties), bounded by
+  /// [limit].
+  ///
+  /// Uses `sale_items.product_name` directly — it NEVER joins the current
+  /// Products table for the display name, so renamed/deactivated products
+  /// still report under the name that was actually rung up.
+  Future<List<TopSellingRow>> getTopSelling({
+    required DateTime start,
+    required DateTime end,
+    int limit = 5,
+  }) {
+    return _topSellingSelect(
+      start: start,
+      end: end,
+      limit: limit,
+    ).get().then(_readTopSelling);
+  }
+
+  Stream<List<TopSellingRow>> watchTopSelling({
+    required DateTime start,
+    required DateTime end,
+    int limit = 5,
+  }) {
+    return _topSellingSelect(
+      start: start,
+      end: end,
+      limit: limit,
+    ).watch().map(_readTopSelling);
+  }
+
+  Selectable<QueryRow> _topSellingSelect({
+    required DateTime start,
+    required DateTime end,
+    required int limit,
+  }) {
+    return attachedDatabase.customSelect(
+      'SELECT sale_items.product_id AS product_id, '
+      'sale_items.product_name AS product_name, '
+      'SUM(sale_items.quantity) AS sold '
+      'FROM sale_items '
+      'JOIN sales ON sales.id = sale_items.sale_id '
+      'WHERE sales.created_at >= ? AND sales.created_at < ? '
+      'GROUP BY sale_items.product_id, sale_items.product_name '
+      'ORDER BY sold DESC, product_name ASC, product_id ASC '
+      'LIMIT ?',
+      variables: [
+        Variable.withDateTime(start),
+        Variable.withDateTime(end),
+        Variable.withInt(limit),
+      ],
+      // Re-run the query whenever sales or sale_items change, so the
+      // dashboard's top-selling list updates live after a new checkout.
+      readsFrom: {sales, saleItems},
+    );
+  }
+
+  List<TopSellingRow> _readTopSelling(List<QueryRow> rows) {
+    return rows
+        .map(
+          (row) => TopSellingRow(
+            productId: row.read<int>('product_id'),
+            productName: row.read<String>('product_name'),
+            quantitySold: row.read<int>('sold'),
+          ),
+        )
+        .toList();
   }
 
   /// Atomically decrements stock, guarded against oversell and inactive

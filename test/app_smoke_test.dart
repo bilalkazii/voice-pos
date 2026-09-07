@@ -54,7 +54,11 @@ void main() {
 
     await tester.tap(find.text('Reports').first);
     await tester.pumpAndSettle();
-    expect(find.text('Reports arrive in a later phase.'), findsOneWidget);
+    await pumpStreams(tester);
+    // Reports is now the real Phase 6 dashboard (empty store).
+    expect(find.text('Reports'), findsWidgets);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('No product sales in this period.'), findsOneWidget);
 
     await tester.tap(find.text('Settings').first);
     await tester.pumpAndSettle();
