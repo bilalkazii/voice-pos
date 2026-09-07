@@ -46,10 +46,11 @@ void main() {
     expect(find.text('Search products or SKU'), findsOneWidget);
     expect(find.text('No products yet.'), findsOneWidget);
 
-    // Remaining placeholders are untouched.
+    // History is now the real Phase 5 screen (empty store).
     await tester.tap(find.text('History').first);
     await tester.pumpAndSettle();
-    expect(find.text('Sales history arrives in a later phase.'), findsOneWidget);
+    expect(find.text('History'), findsWidgets);
+    expect(find.text('No sales yet'), findsOneWidget);
 
     await tester.tap(find.text('Reports').first);
     await tester.pumpAndSettle();

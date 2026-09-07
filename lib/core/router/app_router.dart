@@ -5,6 +5,7 @@ import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/checkout/presentation/checkout_screen.dart';
 import '../../features/checkout/presentation/payment_complete_screen.dart';
 import '../../features/history/presentation/history_screen.dart';
+import '../../features/history/presentation/sale_detail_screen.dart';
 import '../../features/products/presentation/products_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
@@ -129,6 +130,19 @@ abstract final class AppRouter {
               );
             }
             return ReceiptScreen(saleId: saleId);
+          },
+        ),
+        GoRoute(
+          path: '/sale/:saleId',
+          builder: (context, state) {
+            final saleId =
+                int.tryParse(state.pathParameters['saleId'] ?? '');
+            if (saleId == null) {
+              return const Scaffold(
+                body: Center(child: Text('Sale not found.')),
+              );
+            }
+            return SaleDetailScreen(saleId: saleId);
           },
         ),
       ],

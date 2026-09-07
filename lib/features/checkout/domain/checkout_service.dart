@@ -119,6 +119,7 @@ class CheckoutService {
         );
       }
       final itemRows = await _db.saleDao.getItemsForSale(saleId);
+      final itemCount = itemRows.fold(0, (sum, row) => sum + row.quantity);
       return CompletedSale(
         sale: Sale(
           id: saleRow.id,
@@ -127,6 +128,7 @@ class CheckoutService {
           subtotalPaise: saleRow.subtotalPaise,
           totalPaise: saleRow.totalPaise,
           createdAt: saleRow.createdAt,
+          itemCount: itemCount,
         ),
         items: [
           for (final row in itemRows)

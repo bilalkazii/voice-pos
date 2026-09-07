@@ -15,5 +15,24 @@ abstract class SaleRepository {
 
   Stream<List<Sale>> watchRecentSales({int limit});
 
+  /// Reactive, bounded history query. [after] limits to sales created at or
+  /// after that instant (e.g. start of today); [transactionSearch] does a
+  /// case-insensitive partial match on the transaction number. Newest first,
+  /// capped at [limit] (default 50). Each [Sale] carries its `itemCount`.
+  /// Offline only; no backend.
+  Stream<List<Sale>> watchSalesWithCount({
+    DateTime? after,
+    String? transactionSearch,
+    int limit,
+  });
+
+  /// One-shot bounded history query with the same filters as
+  /// [watchSalesWithCount].
+  Future<List<Sale>> getSalesWithCount({
+    DateTime? after,
+    String? transactionSearch,
+    int limit,
+  });
+
   Future<int> saleCount();
 }

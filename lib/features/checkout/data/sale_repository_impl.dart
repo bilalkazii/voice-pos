@@ -38,20 +38,55 @@ class DriftSaleRepository implements SaleRepository {
   @override
   Future<List<Sale>> recentSales({int limit = 50}) async {
     final rows = await _dao.recentSales(limit: limit);
-    return rows.map(_toSale).toList();
+    return rows.map((r) => _toSale(r)).toList();
   }
 
   @override
   Stream<List<Sale>> watchRecentSales({int limit = 50}) {
     return _dao.watchRecentSales(limit: limit).map(
-          (rows) => rows.map(_toSale).toList(),
+          (rows) => rows.map((r) => _toSale(r)).toList(),
         );
+  }
+
+  @override
+  Stream<List<Sale>> watchSalesWithCount({
+    DateTime? after,
+    String? transactionSearch,
+    int limit = 50,
+  }) {
+    return _dao
+        .watchSalesWithCount(
+          after: after,
+          transactionSearch: transactionSearch,
+          limit: limit,
+        )
+        .map(
+          (rows) => rows
+              .map((r) => _toSale(r.sale, itemCount: r.itemCount))
+              .toList(),
+        );
+  }
+
+  @override
+  Future<List<Sale>> getSalesWithCount({
+    DateTime? after,
+    String? transactionSearch,
+    int limit = 50,
+  }) async {
+    final rows = await _dao.getSalesWithCount(
+      after: after,
+      transactionSearch: transactionSearch,
+      limit: limit,
+    );
+    return rows
+        .map((r) => _toSale(r.sale, itemCount: r.itemCount))
+        .toList();
   }
 
   @override
   Future<int> saleCount() => _dao.saleCount();
 
-  Sale _toSale(db.Sale row) {
+  Sale _toSale(db.Sale row, {int itemCount = 0}) {
     return Sale(
       id: row.id,
       transactionNumber: row.transactionNumber,
@@ -59,6 +94,7 @@ class DriftSaleRepository implements SaleRepository {
       subtotalPaise: row.subtotalPaise,
       totalPaise: row.totalPaise,
       createdAt: row.createdAt,
+      itemCount: itemCount,
     );
   }
 

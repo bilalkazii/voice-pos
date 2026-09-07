@@ -13,6 +13,7 @@ class Sale {
     required this.subtotalPaise,
     required this.totalPaise,
     required this.createdAt,
+    this.itemCount = 0,
   });
 
   final int id;
@@ -21,6 +22,11 @@ class Sale {
   final int subtotalPaise;
   final int totalPaise;
   final DateTime createdAt;
+
+  /// Total units across the sale's lines. Populated by the history queries
+  /// (a JOIN) and by the checkout service; defaults to 0 for callers that
+  /// only need the header (e.g. `recentSales`).
+  final int itemCount;
 
   @override
   bool operator ==(Object other) =>
@@ -31,7 +37,8 @@ class Sale {
           paymentMethod == other.paymentMethod &&
           subtotalPaise == other.subtotalPaise &&
           totalPaise == other.totalPaise &&
-          createdAt == other.createdAt;
+          createdAt == other.createdAt &&
+          itemCount == other.itemCount;
 
   @override
   int get hashCode => Object.hash(
@@ -41,6 +48,7 @@ class Sale {
         subtotalPaise,
         totalPaise,
         createdAt,
+        itemCount,
       );
 }
 

@@ -13,6 +13,15 @@ part 'sale_dao.g.dart';
 /// `UPDATE products SET stock_qty = stock_qty - ? WHERE id = ? AND
 /// is_active = 1 AND stock_qty >= ?` — zero affected rows means the sale
 /// must roll back.
+/// A sale header plus its aggregate item count (SUM of line quantities),
+/// produced by a single database-side JOIN + GROUP BY — no per-row N+1.
+class SaleWithCount {
+  const SaleWithCount({required this.sale, required this.itemCount});
+
+  final Sale sale;
+  final int itemCount;
+}
+
 @DriftAccessor(tables: [Sales, SaleItems])
 class SaleDao extends DatabaseAccessor<AppDatabase> with _$SaleDaoMixin {
   SaleDao(super.db);
@@ -55,6 +64,86 @@ class SaleDao extends DatabaseAccessor<AppDatabase> with _$SaleDaoMixin {
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
           ..limit(limit))
         .watch();
+  }
+
+  /// Reactive, bounded history query that composes optional filters and
+  /// includes the item count via a JOIN:
+  /// - [after]: only sales created at/after that instant (Today filter)
+  /// - [transactionSearch]: case-insensitive partial match on the
+  ///   transaction number (LIKE is case-insensitive for ASCII in SQLite)
+  /// - created_at index is leveraged; ordered newest-first, capped at
+  ///   [limit].
+  ///
+  /// The WHERE clauses add together (AND). Data stays reactive: a new
+  /// commit in another flow appears without restarting the app.
+  Stream<List<SaleWithCount>> watchSalesWithCount({
+    DateTime? after,
+    String? transactionSearch,
+    int limit = 50,
+  }) {
+    final sumQty = saleItems.quantity.sum();
+    return _buildSalesWithCountQuery(
+      sumQty: sumQty,
+      after: after,
+      transactionSearch: transactionSearch,
+      limit: limit,
+    ).watch().map((rows) => _readSaleWithCount(rows, sumQty));
+  }
+
+  /// One-shot bounded history query with the same filters as
+  /// [watchSalesWithCount].
+  Future<List<SaleWithCount>> getSalesWithCount({
+    DateTime? after,
+    String? transactionSearch,
+    int limit = 50,
+  }) {
+    final sumQty = saleItems.quantity.sum();
+    return _buildSalesWithCountQuery(
+      sumQty: sumQty,
+      after: after,
+      transactionSearch: transactionSearch,
+      limit: limit,
+    ).get().then((rows) => _readSaleWithCount(rows, sumQty));
+  }
+
+  JoinedSelectStatement<HasResultSet, dynamic> _buildSalesWithCountQuery({
+    required Expression<int> sumQty,
+    DateTime? after,
+    String? transactionSearch,
+    int limit = 50,
+  }) {
+    // Note: `.join(...)` returns a NEW statement, so it can't be part of a
+    // cascade (cascades return the receiver). Assign it explicitly.
+    final query = select(sales).join([
+      leftOuterJoin(saleItems, saleItems.saleId.equalsExp(sales.id)),
+    ]);
+    query
+      ..addColumns([sumQty])
+      ..groupBy([sales.id])
+      ..orderBy([OrderingTerm.desc(sales.createdAt)])
+      ..limit(limit);
+    if (after != null) {
+      query.where(sales.createdAt.isBiggerOrEqualValue(after));
+    }
+    final trimmed = transactionSearch?.trim() ?? '';
+    if (trimmed.isNotEmpty) {
+      query.where(sales.transactionNumber.like('%$trimmed%'));
+    }
+    return query;
+  }
+
+  List<SaleWithCount> _readSaleWithCount(
+    List<TypedResult> rows,
+    Expression<int> sumQty,
+  ) {
+    return rows
+        .map(
+          (row) => SaleWithCount(
+            sale: row.readTable(sales),
+            itemCount: row.read(sumQty) ?? 0,
+          ),
+        )
+        .toList();
   }
 
   Future<int> saleCount() {
