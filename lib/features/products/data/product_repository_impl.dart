@@ -71,8 +71,13 @@ class DriftProductRepository implements ProductRepository {
   }
 
   @override
-  Stream<List<Product>> watchAll() {
-    return _dao.watchAllActive().map(
+  Future<List<Product>> getAllActive() async {
+    final rows = await _dao.getAllActive();
+    return rows.map(_toDomain).toList();
+  }
+
+  @override
+  Stream<List<Product>> watchAll() {    return _dao.watchAllActive().map(
           (rows) => rows.map(_toDomain).toList(),
         );
   }

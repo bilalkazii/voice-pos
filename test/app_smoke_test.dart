@@ -23,20 +23,23 @@ Future<AppDatabase> pumpApp(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('VoicePosApp boots to cart placeholder with bottom nav',
+  testWidgets('VoicePosApp boots to the current bill with bottom nav',
       (tester) async {
     final db = await pumpApp(tester);
 
-    // Default route is the cart / current-bill placeholder (Phase 2).
-    expect(find.text('Current Bill'), findsWidgets);
-    expect(find.text('Cart arrives in Phase 1.'), findsOneWidget);
+    // Default route is the real Phase 2 cart (empty database).
+    expect(find.text('Voice POS'), findsWidgets);
+    expect(find.text('Current Bill'), findsOneWidget);
+    expect(find.text('No items yet.'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'SPEAK'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'CHECKOUT'), findsOneWidget);
 
     // Bottom navigation shell with the five destinations.
     for (final label in ['Bill', 'Products', 'History', 'Reports', 'Settings']) {
       expect(find.text(label), findsWidgets);
     }
 
-    // Products is now the real Phase 1 screen (empty database).
+    // Products is the real Phase 1 screen (empty database).
     await tester.tap(find.text('Products').first);
     await tester.pumpAndSettle();
     await pumpStreams(tester);
@@ -59,7 +62,9 @@ void main() {
     // Back to the cart default.
     await tester.tap(find.text('Bill').first);
     await tester.pumpAndSettle();
-    expect(find.text('Cart arrives in Phase 1.'), findsOneWidget);
+    await pumpStreams(tester);
+    expect(find.text('Current Bill'), findsOneWidget);
+    expect(find.text('No items yet.'), findsOneWidget);
 
     await disposeAndCloseDb(tester, db);
   });

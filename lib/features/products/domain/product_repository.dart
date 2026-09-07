@@ -22,6 +22,10 @@ abstract class ProductRepository {
   /// Empty query returns an empty list — use [watchAll] for the full list.
   Future<List<Product>> search(String query);
 
+  /// One-shot fetch of all active products, alphabetical. For pickers and
+  /// other UIs that need a snapshot rather than a live stream.
+  Future<List<Product>> getAllActive();
+
   /// Live list of all active products, alphabetical.
   Stream<List<Product>> watchAll();
 

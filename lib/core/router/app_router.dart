@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/cart/presentation/cart_screen.dart';
+import '../../features/checkout/presentation/checkout_screen.dart';
 import '../../features/history/presentation/history_screen.dart';
 import '../../features/products/presentation/products_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
@@ -95,6 +96,12 @@ abstract final class AppRouter {
               ],
             ),
           ],
+        ),
+        // Checkout sits outside the bottom-nav shell: full-screen step with
+        // a back button. Phase 2 is a placeholder only.
+        GoRoute(
+          path: '/checkout',
+          builder: (context, state) => const CheckoutScreen(),
         ),
       ],
     );

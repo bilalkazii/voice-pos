@@ -47,3 +47,10 @@ Future<void> disposeAndCloseDb(WidgetTester tester, AppDatabase db) async {
   await closeFuture;
   await tester.pump();
 }
+
+/// Lets transient SnackBars (4s duration, e.g. 'Added …') expire so they
+/// neither cover buttons nor queue ahead of the SnackBar under test.
+Future<void> expireSnackbars(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
+}
