@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Voice input: requested at runtime on first SPEAK tap, never at startup. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application
         android:label="Voice POS"
         android:name="${applicationName}"

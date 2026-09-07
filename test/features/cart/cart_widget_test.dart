@@ -7,8 +7,11 @@ import 'package:voice_pos/features/cart/presentation/cart_screen.dart';
 import 'package:voice_pos/features/products/data/product_repository_impl.dart';
 import 'package:voice_pos/features/products/domain/product_repository.dart';
 import 'package:voice_pos/features/products/presentation/products_providers.dart';
+import 'package:voice_pos/features/voice/domain/speech_services.dart';
+import 'package:voice_pos/features/voice/presentation/voice_providers.dart';
 
 import '../../test_utils.dart';
+import '../voice/fakes.dart';
 
 Future<AppDatabase> seedDb({
   Future<void> Function(ProductRepository repo)? seed,
@@ -37,15 +40,21 @@ Future<void> createViaRepo(
   );
 }
 
-/// Pumps just the cart screen (no router).
+/// Pumps just the cart screen (no router). Voice speech service can be
+/// overridden with a fake; defaults to the real service (never invoked
+/// unless a test taps SPEAK).
 Future<AppDatabase> pumpCartScreen(
   WidgetTester tester, {
   Future<void> Function(ProductRepository repo)? seed,
+  SpeechToTextService? speech,
 }) async {
   final db = await seedDb(seed: seed);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        if (speech != null) speechServiceProvider.overrideWithValue(speech),
+      ],
       child: const MaterialApp(home: CartScreen()),
     ),
   );
@@ -90,16 +99,18 @@ void main() {
       await disposeAndCloseDb(tester, db);
     });
 
-    testWidgets('speak button explains voice is coming later', (tester) async {
-      final db = await pumpCartScreen(tester);
+    testWidgets('speak button runs the voice flow (empty transcript)', (tester) async {
+      final db = await pumpCartScreen(
+        tester,
+        speech: FakeSpeechService(transcript: null),
+      );
 
       await tester.tap(find.widgetWithText(FilledButton, 'SPEAK'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(
-        find.text('Voice input arrives in a later phase.'),
-        findsOneWidget,
-      );
+      // No speech recognized -> concise error, cart untouched.
+      expect(find.text("Didn't catch that. Try again."), findsOneWidget);
+      expect(find.text('No items yet.'), findsOneWidget);
 
       await disposeAndCloseDb(tester, db);
     });

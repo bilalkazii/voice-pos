@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/money.dart';
+import '../../voice/domain/voice_state.dart';
+import '../../voice/presentation/voice_providers.dart';
 import '../domain/cart_item.dart';
 import 'cart_providers.dart';
 import 'product_picker_sheet.dart';
@@ -17,6 +19,57 @@ class CartScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
+    ref.listen(
+      voiceControllerProvider.select((s) => s.checkoutRequestId),
+      (previous, next) {
+        if (next > (previous ?? 0) && context.mounted) {
+          context.push('/checkout');
+        }
+      },
+    );
+    ref.listen(
+      voiceControllerProvider.select((s) => s.status),
+      (previous, next) async {
+        if (previous == next || !context.mounted) return;
+        final voice = ref.read(voiceControllerProvider);
+        if ((next == VoiceStatus.success || next == VoiceStatus.error) &&
+            voice.message.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(voice.message)),
+          );
+        } else if (next == VoiceStatus.confirmationRequired) {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Clear the current bill?'),
+              content: const Text(
+                'All items will be removed. Inventory is not affected.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTokens.destructiveRed,
+                  ),
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Clear'),
+                ),
+              ],
+            ),
+          );
+          if (!context.mounted) return;
+          final controller = ref.read(voiceControllerProvider.notifier);
+          if (confirmed == true) {
+            await controller.confirmPendingClear();
+          } else {
+            controller.cancelPending();
+          }
+        }
+      },
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -76,6 +129,7 @@ class CartScreen extends ConsumerWidget {
                   ),
           ),
           _TotalRow(totalPaise: cart.totalPaise),
+          const _VoiceStatusArea(),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppTokens.screenPadding,
@@ -83,11 +137,7 @@ class CartScreen extends ConsumerWidget {
               AppTokens.screenPadding,
               0,
             ),
-            child: FilledButton.icon(
-              onPressed: () => _voiceComingSoon(context),
-              icon: const Icon(Icons.mic, size: AppTokens.iconMedium),
-              label: const Text('SPEAK'),
-            ),
+            child: const _VoiceButton(),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -122,15 +172,7 @@ class CartScreen extends ConsumerWidget {
     }
   }
 
-  void _voiceComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Voice input arrives in a later phase.'),
-      ),
-    );
-  }
-
-  Future<void> _confirmClear(BuildContext context, WidgetRef ref) async {
+  void _confirmClear(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -156,6 +198,127 @@ class CartScreen extends ConsumerWidget {
     if (confirmed == true) {
       ref.read(cartProvider.notifier).clearCart();
     }
+  }
+}
+
+/// Large push-to-talk button. One tap = one command; tapping while
+/// listening cancels. Processing disables the button to avoid races.
+class _VoiceButton extends ConsumerWidget {
+  const _VoiceButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(
+      voiceControllerProvider.select((s) => s.status),
+    );
+    final controller = ref.read(voiceControllerProvider.notifier);
+    final listening = status == VoiceStatus.listening;
+    final processing = status == VoiceStatus.processing;
+    return FilledButton.icon(
+      onPressed: processing
+          ? null
+          : listening
+              ? controller.cancelListening
+              : controller.startVoiceCommand,
+      icon: Icon(
+        listening ? Icons.stop : Icons.mic,
+        size: AppTokens.iconMedium,
+      ),
+      label: Text(
+        listening
+            ? 'LISTENING…'
+            : processing
+                ? 'PROCESSING…'
+                : 'SPEAK',
+      ),
+    );
+  }
+}
+
+/// Subtle transcript line plus the clarification card. Success/error
+/// feedback travels via SnackBar (see the listeners in [CartScreen]).
+class _VoiceStatusArea extends ConsumerWidget {
+  const _VoiceStatusArea();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final voice = ref.watch(voiceControllerProvider);
+    final showTranscript = voice.transcript.isNotEmpty &&
+        voice.status != VoiceStatus.idle &&
+        voice.status != VoiceStatus.listening;
+    if (voice.status == VoiceStatus.clarificationRequired) {
+      return _ClarificationCard(voice: voice);
+    }
+    if (!showTranscript) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppTokens.screenPadding,
+        AppTokens.space8,
+        AppTokens.screenPadding,
+        0,
+      ),
+      child: Text(
+        'Heard: "${voice.transcript}"',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+            ),
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+class _ClarificationCard extends ConsumerWidget {
+  const _ClarificationCard({required this.voice});
+
+  final VoiceState voice;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(voiceControllerProvider.notifier);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        AppTokens.screenPadding,
+        AppTokens.space8,
+        AppTokens.screenPadding,
+        0,
+      ),
+      padding: const EdgeInsets.all(AppTokens.space12),
+      decoration: BoxDecoration(
+        color: AppTokens.voiceBlueSoft,
+        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            voice.message,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppTokens.space8),
+          Wrap(
+            spacing: AppTokens.space8,
+            runSpacing: AppTokens.space8,
+            children: [
+              for (final candidate in voice.candidates)
+                ActionChip(
+                  label: Text(candidate.name),
+                  onPressed: () => controller.chooseCandidate(candidate),
+                ),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: controller.cancelPending,
+              child: const Text('Cancel'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
