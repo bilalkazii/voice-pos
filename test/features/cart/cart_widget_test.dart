@@ -333,7 +333,7 @@ void main() {
   });
 
   group('checkout navigation', () {
-    testWidgets('checkout enabled with items, opens placeholder', (tester) async {
+    testWidgets('checkout enabled with items, opens review screen', (tester) async {
       final db = await seedDb(
         seed: (repo) => createViaRepo(repo, name: 'Pepsi', price: 2000),
       );
@@ -355,14 +355,19 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'CHECKOUT'));
       await tester.pumpAndSettle();
 
+      // Real Phase 4 review screen: items, CASH badge, explicit confirm.
+      expect(find.text('Review Bill'), findsOneWidget);
+      expect(find.text('CASH'), findsOneWidget);
       expect(
-        find.text('Cash checkout arrives in the next phase. No payment is processed yet.'),
+        find.widgetWithText(FilledButton, 'CONFIRM CASH PAYMENT'),
         findsOneWidget,
       );
-      expect(find.text('₹20.00'), findsOneWidget);
+      expect(find.text('Pepsi'), findsOneWidget);
+      expect(find.text('₹20.00'), findsWidgets);
 
-      await tester.tap(find.text('Back to bill'));
+      await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
+      expect(find.text('Current Bill'), findsOneWidget);
       expect(find.text('Pepsi'), findsOneWidget);
 
       await disposeAndCloseDb(tester, db);

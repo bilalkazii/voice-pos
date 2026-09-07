@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/checkout/presentation/checkout_screen.dart';
+import '../../features/checkout/presentation/payment_complete_screen.dart';
 import '../../features/history/presentation/history_screen.dart';
 import '../../features/products/presentation/products_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
@@ -97,11 +98,38 @@ abstract final class AppRouter {
             ),
           ],
         ),
-        // Checkout sits outside the bottom-nav shell: full-screen step with
-        // a back button. Phase 2 is a placeholder only.
+        // Checkout sits outside the bottom-nav shell: full-screen steps.
+        // /checkout is the review + explicit CONFIRM CASH PAYMENT step —
+        // opening it (including via voice) never processes a payment.
         GoRoute(
           path: '/checkout',
           builder: (context, state) => const CheckoutScreen(),
+        ),
+        GoRoute(
+          path: '/payment-complete/:saleId',
+          builder: (context, state) {
+            final saleId =
+                int.tryParse(state.pathParameters['saleId'] ?? '');
+            if (saleId == null) {
+              return const Scaffold(
+                body: Center(child: Text('Sale not found.')),
+              );
+            }
+            return PaymentCompleteScreen(saleId: saleId);
+          },
+        ),
+        GoRoute(
+          path: '/receipt/:saleId',
+          builder: (context, state) {
+            final saleId =
+                int.tryParse(state.pathParameters['saleId'] ?? '');
+            if (saleId == null) {
+              return const Scaffold(
+                body: Center(child: Text('Receipt not found.')),
+              );
+            }
+            return ReceiptScreen(saleId: saleId);
+          },
         ),
       ],
     );
