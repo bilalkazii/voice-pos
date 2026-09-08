@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.mizaantech.voice_pos"
-    compileSdk = flutter.compileSdkVersion
+    // 37 (not the Flutter-default 36): permission_handler_android requires
+    // compiling against API 37+. Backward compatible — minSdk unchanged.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

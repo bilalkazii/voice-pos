@@ -43,4 +43,21 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
       AppSettingsCompanion.insert(key: key, value: Value(value)),
     );
   }
+
+  /// Replaces a multi-key selection atomically: writes [combined] and
+  /// clears [legacyKeys] inside ONE database transaction, so concurrent
+  /// readers never observe a half-written id-without-name pair. Keys stay
+  /// caller-owned; this method only owns the transaction boundary.
+  Future<void> writePrinterSelectionAtomic({
+    required String? combined,
+    required String combinedKey,
+    required List<String> legacyKeys,
+  }) {
+    return attachedDatabase.transaction(() async {
+      await setValue(combinedKey, combined);
+      for (final key in legacyKeys) {
+        await setValue(key, null);
+      }
+    });
+  }
 }

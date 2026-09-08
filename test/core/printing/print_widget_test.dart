@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voice_pos/app.dart';
 import 'package:voice_pos/core/db/app_database.dart';
+import 'package:voice_pos/core/printing/presentation/print_controller.dart';
 import 'package:voice_pos/features/products/data/product_repository_impl.dart';
 import 'package:voice_pos/features/products/presentation/products_providers.dart';
+import 'package:voice_pos/features/settings/data/settings_repository_impl.dart';
 
 import '../../test_utils.dart';
+import 'fakes.dart';
 
 Future<void> seedCatalog(DriftProductRepository repo) async {
   await repo.create(
@@ -19,10 +22,11 @@ Future<void> seedCatalog(DriftProductRepository repo) async {
   );
 }
 
-/// Full app with an in-memory database.
+/// Full app with an in-memory database and an optional fake transport.
 Future<AppDatabase> pumpVoicePos(
   WidgetTester tester, {
   Future<void> Function(DriftProductRepository repo)? seed,
+  FakeBluetoothTransport? transport,
 }) async {
   final db = openTestDb();
   if (seed != null) {
@@ -30,7 +34,11 @@ Future<AppDatabase> pumpVoicePos(
   }
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        if (transport != null)
+          bluetoothTransportProvider.overrideWithValue(transport),
+      ],
       child: const VoicePosApp(),
     ),
   );
@@ -108,6 +116,41 @@ void main() {
       // Both attempts reported unavailable; still exactly one sale.
       expect(find.text('Printer not configured'), findsOneWidget);
       expect(await db.saleDao.saleCount(), 1);
+
+      await disposeAndCloseDb(tester, db);
+    });
+
+    testWidgets('configured printer prints, reports success, sale intact',
+        (tester) async {
+      final transport = FakeBluetoothTransport();
+      final db = await pumpVoicePos(
+        tester,
+        seed: seedCatalog,
+        transport: transport,
+      );
+      await DriftSettingsRepository(db.settingsDao).setPrinterSelection(
+        id: '66:02:BD:06:18:7B',
+        name: 'Office-T58',
+      );
+      await sellOnePepsi(tester);
+
+      await tester.tap(
+        find.widgetWithText(OutlinedButton, 'PRINT RECEIPT'),
+      );
+      await tester.pumpAndSettle();
+      await pumpStreams(tester);
+
+      // Real adapter path with a fake transport: bytes written, success.
+      expect(find.text('Printed'), findsOneWidget);
+      expect(transport.connects, 1);
+      expect(transport.writtenBatches.length, 1);
+      expect(transport.lastConnectedAddress, '66:02:BD:06:18:7B');
+      expect(transport.disconnects, 1);
+      expect(await db.saleDao.saleCount(), 1);
+      final pepsi =
+          (await DriftProductRepository(db.productDao).search('pepsi'))
+              .first;
+      expect(pepsi.stockQty, 9);
 
       await disposeAndCloseDb(tester, db);
     });

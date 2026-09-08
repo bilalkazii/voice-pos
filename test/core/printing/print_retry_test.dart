@@ -4,8 +4,6 @@ import 'package:voice_pos/core/db/app_database.dart'
     hide Product, Sale, SaleItem;
 import 'package:voice_pos/core/printing/data/unavailable_printer_service.dart';
 import 'package:voice_pos/core/printing/domain/print_result.dart';
-import 'package:voice_pos/core/printing/domain/printer_service.dart';
-import 'package:voice_pos/core/printing/domain/receipt_data.dart';
 import 'package:voice_pos/core/printing/domain/receipt_mapper.dart';
 import 'package:voice_pos/features/cart/domain/cart_service.dart';
 import 'package:voice_pos/features/cart/domain/cart_state.dart';
@@ -14,24 +12,7 @@ import 'package:voice_pos/features/checkout/domain/checkout_service.dart';
 import 'package:voice_pos/features/checkout/domain/sale.dart';
 import 'package:voice_pos/features/products/data/product_repository_impl.dart';
 
-/// Deterministic fake: plays back a scripted result per attempt and records
-/// every receipt it was given. Has no reference to checkout, cart, or the
-/// database — it cannot create or mutate a sale by construction.
-class FakePrinterService implements PrinterService {
-  FakePrinterService(this.script);
-
-  final List<PrintResult> script;
-  final List<ReceiptData> printed = [];
-
-  int get calls => printed.length;
-
-  @override
-  Future<PrintResult> printReceipt(ReceiptData receipt) async {
-    printed.add(receipt);
-    if (script.isEmpty) return const PrintFailed('No scripted result');
-    return script.removeAt(0);
-  }
-}
+import 'fakes.dart';
 
 /// Opens a memory database, seeds one product (Pepsi, stock 10), commits a
 /// real cash sale for 2 × Pepsi through [CheckoutService], and returns the

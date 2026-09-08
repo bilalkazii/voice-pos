@@ -1,16 +1,35 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/unavailable_printer_service.dart';
+import '../../../features/settings/presentation/settings_providers.dart';
+import '../bluetooth/bluetooth_transport.dart';
+import '../bluetooth/spp_bluetooth_transport.dart';
+import '../data/bluetooth_printer_service.dart';
 import '../domain/print_result.dart';
 import '../domain/printer_service.dart';
 import '../domain/receipt_data.dart';
 
-/// The [PrinterService] in use. Phase 8A wires the honest
-/// [UnavailablePrinterService]; a later hardware phase replaces this
-/// single override with a Bluetooth/ESC-POS adapter — nothing else,
-/// especially not [CheckoutService], changes.
+/// Short-lived SPP transport. Constructing it performs zero platform work;
+/// every method degrades gracefully, so building this provider is safe in
+/// widget tests (fakes override it wherever Bluetooth is exercised).
+final bluetoothTransportProvider = Provider<BluetoothTransport>((ref) {
+  const transport = SppBluetoothTransport();
+  ref.onDispose(() => unawaited(transport.dispose()));
+  return transport;
+});
+
+/// The [PrinterService] in use: the real Bluetooth/ESC-POS adapter reading
+/// its configuration from Settings. With no printer configured it honestly
+/// reports unavailable — [CheckoutService] and everything downstream is
+/// untouched by printing.
 final printerServiceProvider = Provider<PrinterService>(
-  (ref) => const UnavailablePrinterService(),
+  (ref) {
+    return BluetoothPrinterService(
+      settings: ref.watch(settingsRepositoryProvider),
+      transport: ref.watch(bluetoothTransportProvider),
+    );
+  },
 );
 
 /// Coordinates print attempts for ONE already-committed receipt.

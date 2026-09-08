@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Voice input: requested at runtime on first SPEAK tap, never at startup. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Bluetooth thermal printing: legacy permissions only apply pre-31;
+         BLUETOOTH_CONNECT is requested at runtime on first printer setup or
+         print attempt, never at startup. No location permission is used. -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <application
         android:label="Voice POS"
         android:name="${applicationName}"

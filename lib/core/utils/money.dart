@@ -19,6 +19,19 @@ abstract final class Money {
     return '$sign${AppConstants.currencySymbol}$rupeesText.$paiseText';
   }
 
+  /// ASCII-only variant for thermal printers whose code pages lack the
+  /// rupee sign: `11200` → `Rs.112.00`. Same integer math and Indian
+  /// digit grouping as [formatPaise].
+  static String formatPaiseAscii(int paise, {String prefix = 'Rs.'}) {
+    final sign = paise < 0 ? '-' : '';
+    final abs = paise.abs();
+    final rupees = abs ~/ AppConstants.minorUnitsPerRupee;
+    final remainder = abs % AppConstants.minorUnitsPerRupee;
+    final rupeesText = _groupThousands(rupees);
+    final paiseText = remainder.toString().padLeft(2, '0');
+    return '$sign$prefix$rupeesText.$paiseText';
+  }
+
   /// Adds two paise amounts.
   static int add(int aPaise, int bPaise) => aPaise + bPaise;
 

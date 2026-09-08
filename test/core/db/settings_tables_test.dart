@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 import 'package:voice_pos/core/db/app_database.dart';
+import 'package:voice_pos/core/errors/failures.dart';
 import 'package:voice_pos/features/settings/data/settings_repository_impl.dart';
 import 'package:voice_pos/features/settings/domain/app_settings.dart';
 
@@ -136,7 +137,7 @@ void main() {
       expect((await repo.load()).defaultLowStockThreshold, 5);
     });
 
-    test('printer selection persists; blank clears to unconfigured', () async {
+    test('printer selection persists atomically; blank clears', () async {
       final db = openTestDb();
       addTearDown(db.close);
       final repo = DriftSettingsRepository(db.settingsDao);
@@ -145,16 +146,90 @@ void main() {
       expect(loaded.selectedPrinterId, isNull);
       expect(loaded.hasPrinterConfigured, isFalse);
 
-      await repo.setPrinterSelection(id: 'AA:BB', name: 'Thermal-58');
+      await repo.setPrinterSelection(
+        id: '66:02:BD:06:18:7B',
+        name: 'Thermal-58',
+      );
       loaded = await repo.load();
-      expect(loaded.selectedPrinterId, 'AA:BB');
+      expect(loaded.selectedPrinterId, '66:02:BD:06:18:7B');
       expect(loaded.selectedPrinterName, 'Thermal-58');
       expect(loaded.hasPrinterConfigured, isTrue);
+
+      // Atomic single-row storage: exactly one printer row exists, so a
+      // reader can never observe id-without-name.
+      final rows = await db.settingsDao.getAll();
+      final printerRows = rows
+          .where((r) => r.key == DriftSettingsRepository.keyPrinterSelection)
+          .toList();
+      expect(printerRows.length, 1);
+      expect(printerRows.single.value, contains('66:02:BD:06:18:7B'));
 
       await repo.setPrinterSelection(id: '  ', name: null);
       loaded = await repo.load();
       expect(loaded.selectedPrinterId, isNull);
       expect(loaded.hasPrinterConfigured, isFalse);
+    });
+
+    test('malformed printer address is rejected; previous value intact',
+        () async {
+      final db = openTestDb();
+      addTearDown(db.close);
+      final repo = DriftSettingsRepository(db.settingsDao);
+
+      await repo.setPrinterSelection(
+        id: '66:02:BD:06:18:7B',
+        name: 'Thermal-58',
+      );
+
+      expect(
+        () => repo.setPrinterSelection(id: 'not-a-mac', name: 'Bogus'),
+        throwsA(isA<ValidationFailure>()),
+      );
+      expect(
+        () => repo.setPrinterSelection(id: 'AA:BB', name: 'Short'),
+        throwsA(isA<ValidationFailure>()),
+      );
+
+      // Nothing was written: the previous selection is untouched.
+      final loaded = await repo.load();
+      expect(loaded.selectedPrinterId, '66:02:BD:06:18:7B');
+      expect(loaded.selectedPrinterName, 'Thermal-58');
+    });
+
+    test('legacy split-key pair still loads (Phase 7 databases)', () async {
+      final db = openTestDb();
+      addTearDown(db.close);
+      final repo = DriftSettingsRepository(db.settingsDao);
+
+      // Simulate a database written before the serialized key existed.
+      await db.settingsDao.setValue(
+        DriftSettingsRepository.legacyKeyPrinterId,
+        '66:02:BD:06:18:7B',
+      );
+      await db.settingsDao.setValue(
+        DriftSettingsRepository.legacyKeyPrinterName,
+        'Old Thermal',
+      );
+
+      final loaded = await repo.load();
+      expect(loaded.selectedPrinterId, '66:02:BD:06:18:7B');
+      expect(loaded.selectedPrinterName, 'Old Thermal');
+      expect(loaded.hasPrinterConfigured, isTrue);
+
+      // Rewriting through the new path clears the legacy rows.
+      await repo.setPrinterSelection(
+        id: '00:11:22:33:44:55',
+        name: 'New Thermal',
+      );
+      final rows = await db.settingsDao.getAll();
+      final legacyLeftovers = rows.where(
+        (r) =>
+            (r.key == DriftSettingsRepository.legacyKeyPrinterId ||
+                r.key == DriftSettingsRepository.legacyKeyPrinterName) &&
+            r.value != null,
+      );
+      expect(legacyLeftovers, isEmpty);
+      expect((await repo.load()).selectedPrinterId, '00:11:22:33:44:55');
     });
 
     test('partial updates never disturb unrelated settings', () async {

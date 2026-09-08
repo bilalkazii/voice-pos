@@ -6,6 +6,8 @@ import 'package:voice_pos/core/printing/domain/printer_service.dart';
 import 'package:voice_pos/core/printing/domain/receipt_data.dart';
 import 'package:voice_pos/core/printing/presentation/print_controller.dart';
 
+import 'fakes.dart';
+
 ReceiptData sampleReceipt() {
   return ReceiptData(
     storeName: 'Kazi Mart',
@@ -24,21 +26,6 @@ ReceiptData sampleReceipt() {
       ),
     ],
   );
-}
-
-/// Scripted fake: plays back one result per call and counts invocations.
-class FakePrinterService implements PrinterService {
-  FakePrinterService(this.script);
-
-  final List<PrintResult> script;
-  int calls = 0;
-
-  @override
-  Future<PrintResult> printReceipt(ReceiptData receipt) async {
-    calls++;
-    if (script.isEmpty) return const PrintFailed('No scripted result');
-    return script.removeAt(0);
-  }
 }
 
 /// Printer that throws instead of returning a result (misbehaving adapter).

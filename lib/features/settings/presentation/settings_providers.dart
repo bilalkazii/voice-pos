@@ -106,6 +106,52 @@ class SettingsController extends Notifier<AsyncValue<void>> {
       return failure;
     }
   }
+
+  /// Persists the selected Bluetooth printer (address + display name) as
+  /// one atomic selection. Returns the [Failure] to display, if any.
+  Future<Failure?> savePrinterSelection({
+    required String address,
+    required String name,
+  }) async {
+    if (_busy) return null;
+    state = const AsyncLoading();
+    try {
+      await ref
+          .read(settingsRepositoryProvider)
+          .setPrinterSelection(id: address, name: name);
+      state = const AsyncData(null);
+      return null;
+    } on Failure catch (e) {
+      state = AsyncError(e, StackTrace.current);
+      return e;
+    } catch (_) {
+      const failure =
+          DatabaseFailure(message: 'Could not save printer.');
+      state = AsyncError(failure, StackTrace.current);
+      return failure;
+    }
+  }
+
+  /// Clears the configured printer back to unconfigured.
+  Future<Failure?> forgetPrinter() async {
+    if (_busy) return null;
+    state = const AsyncLoading();
+    try {
+      await ref
+          .read(settingsRepositoryProvider)
+          .setPrinterSelection(id: null, name: null);
+      state = const AsyncData(null);
+      return null;
+    } on Failure catch (e) {
+      state = AsyncError(e, StackTrace.current);
+      return e;
+    } catch (_) {
+      const failure =
+          DatabaseFailure(message: 'Could not forget printer.');
+      state = AsyncError(failure, StackTrace.current);
+      return failure;
+    }
+  }
 }
 
 final settingsControllerProvider =
