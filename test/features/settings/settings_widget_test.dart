@@ -99,8 +99,8 @@ void main() {
       expect(find.textContaining('Not configured'), findsOneWidget);
       expect(
         find.textContaining(
-          'Printer support will be available when hardware '
-          'integration is enabled.',
+          'Pair your 58mm printer in Android Bluetooth settings, '
+          'then tap Set Up Printer.',
         ),
         findsOneWidget,
       );

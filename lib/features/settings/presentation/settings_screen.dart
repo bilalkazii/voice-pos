@@ -201,8 +201,8 @@ class _PrinterSection extends ConsumerWidget {
               subtitle: address == null
                   ? const Text(
                       'Not configured\n'
-                      'Printer support will be available when hardware '
-                      'integration is enabled.',
+                      'Pair your 58mm printer in Android Bluetooth settings, '
+                      'then tap Set Up Printer.',
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
