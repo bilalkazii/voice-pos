@@ -232,6 +232,34 @@ void main() {
       expect((await repo.load()).selectedPrinterId, '00:11:22:33:44:55');
     });
 
+    test('corrupt printer_selection degrades to unconfigured', () async {
+      final db = openTestDb();
+      addTearDown(db.close);
+      final repo = DriftSettingsRepository(db.settingsDao);
+
+      // Hand-written garbage must never crash loading.
+      await db.settingsDao.setValue(
+        DriftSettingsRepository.keyPrinterSelection,
+        'not-json{{{',
+      );
+
+      final loaded = await repo.load();
+      expect(loaded.selectedPrinterId, isNull);
+      expect(loaded.hasPrinterConfigured, isFalse);
+      // Unrelated settings still load fine.
+      expect(loaded.storeName, 'My Store');
+
+      // A valid write recovers cleanly afterwards.
+      await repo.setPrinterSelection(
+        id: '66:02:BD:06:18:7B',
+        name: 'Thermal-58',
+      );
+      expect(
+        (await repo.load()).selectedPrinterId,
+        '66:02:BD:06:18:7B',
+      );
+    });
+
     test('partial updates never disturb unrelated settings', () async {
       final db = openTestDb();
       addTearDown(db.close);

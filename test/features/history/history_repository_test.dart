@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voice_pos/core/db/app_database.dart';
+import 'package:voice_pos/core/errors/failures.dart';
 import 'package:voice_pos/features/checkout/data/sale_repository_impl.dart';
 import 'package:voice_pos/features/checkout/domain/payment_method.dart';
 import 'package:voice_pos/features/products/data/product_repository_impl.dart';
@@ -232,6 +233,28 @@ void main() {
       expect(completed.items.first.sku, 'PEP001');
       expect(completed.items.first.unitPricePaise, 5000);
       expect(completed.sale.totalPaise, 5000);
+    });
+
+    test('corrupt payment method maps to DatabaseFailure, not raw error',
+        () async {
+      final db = openTestDb();
+      addTearDown(db.close);
+      final repo = DriftSaleRepository(db.saleDao);
+
+      // Bypass the service to simulate externally corrupted data.
+      final saleId = await db.saleDao.createSale(
+        SalesCompanion.insert(
+          transactionNumber: 'VP-CORRUPT',
+          paymentMethod: 'bitcoin',
+          subtotalPaise: 100,
+          totalPaise: 100,
+        ),
+      );
+
+      expect(
+        () => repo.getSaleWithItems(saleId),
+        throwsA(isA<DatabaseFailure>()),
+      );
     });
   });
 }

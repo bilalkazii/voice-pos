@@ -11,6 +11,7 @@ import 'package:voice_pos/features/cart/domain/cart_state.dart';
 import 'package:voice_pos/features/cart/presentation/cart_providers.dart';
 import 'package:voice_pos/features/checkout/domain/checkout_service.dart';
 import 'package:voice_pos/features/checkout/domain/payment_method.dart';
+import 'package:voice_pos/features/checkout/domain/sale.dart';
 import 'package:voice_pos/features/checkout/presentation/checkout_providers.dart';
 import 'package:voice_pos/features/products/data/product_repository_impl.dart';
 import 'package:voice_pos/features/products/domain/product.dart';
@@ -387,6 +388,63 @@ void main() {
         await container.read(saleRepositoryProvider).saleCount(),
         0,
       );
+    });
+  });
+
+  group('concurrent checkout attempts', () {
+    test('two simultaneous checkouts cannot over-deduct inventory', () async {
+      // Stock 3, two carts each wanting 2: at most one sale can commit.
+      final seed = await openSeededDb(pepsiStock: 3);
+      final service = CheckoutService(seed.db);
+      final cartA = cartWith(const CartState(), seed.pepsi, quantity: 2);
+      final cartB = cartWith(const CartState(), seed.pepsi, quantity: 2);
+
+      Future<Object> attempt(CartState cart) async {
+        try {
+          return await service.completeCashSale(cart);
+        } catch (e) {
+          return e;
+        }
+      }
+
+      final results = await Future.wait([attempt(cartA), attempt(cartB)]);
+      final successes = results.whereType<CompletedSale>().toList();
+
+      // Exactly one winner: one sale, one transaction number, stock 3 → 1.
+      expect(successes.length, 1);
+      expect(await seed.db.saleDao.saleCount(), 1);
+      final remaining = (await seed.repo.getById(seed.pepsi.id))!.stockQty;
+      expect(remaining, 1);
+      expect(remaining, greaterThanOrEqualTo(0));
+
+      // The loser failed loudly (stock guard or busy write) — never silent.
+      final failures = results.where((r) => r is! CompletedSale).toList();
+      expect(failures.length, 1);
+      expect(failures.single, isNotNull);
+    });
+
+    test('loser of a stock race leaves no partial records', () async {
+      final seed = await openSeededDb(pepsiStock: 2);
+      final service = CheckoutService(seed.db);
+      final cartA = cartWith(const CartState(), seed.pepsi, quantity: 2);
+      final cartB = cartWith(const CartState(), seed.pepsi, quantity: 2);
+
+      Future<Object> attempt(CartState cart) async {
+        try {
+          return await service.completeCashSale(cart);
+        } catch (e) {
+          return e;
+        }
+      }
+
+      await Future.wait([attempt(cartA), attempt(cartB)]);
+
+      // Winner took all 2 units; loser rolled back entirely.
+      expect(await seed.db.saleDao.saleCount(), 1);
+      expect((await seed.repo.getById(seed.pepsi.id))!.stockQty, 0);
+      final onlySale = (await seed.db.saleDao.recentSales()).single;
+      final items = await seed.db.saleDao.getItemsForSale(onlySale.id);
+      expect(items.fold(0, (sum, e) => sum + e.quantity), 2);
     });
   });
 }

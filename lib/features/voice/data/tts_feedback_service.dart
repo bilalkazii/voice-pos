@@ -6,8 +6,8 @@ import '../domain/speech_services.dart';
 /// Fire-and-forget by contract: [speak] never throws and never awaits
 /// speech completion, so a slow/missing TTS engine can never stall a sale.
 ///
-/// There is no voice-settings screen in V1; [enabled] keeps the service
-/// easy to wire to a Settings toggle later without touching callers.
+/// Each utterance stops any in-flight speech first, so rapid voice commands
+/// replace — rather than queue behind — the previous confirmation.
 class TtsFeedbackService implements VoiceFeedbackService {
   TtsFeedbackService({FlutterTts? tts, this.enabled = true})
       : _tts = tts ?? FlutterTts();
@@ -26,6 +26,9 @@ class TtsFeedbackService implements VoiceFeedbackService {
         await _tts.awaitSpeakCompletion(false);
         _configured = true;
       }
+      // Flush: a new confirmation replaces overlapping speech instead of
+      // queueing behind it during rapid voice commands.
+      await _tts.stop();
       await _tts.speak(text);
     } catch (_) {
       // A silent phone beats a crashed sale.

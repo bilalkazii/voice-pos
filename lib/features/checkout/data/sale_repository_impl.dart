@@ -1,5 +1,6 @@
 import '../../../core/db/app_database.dart' as db;
 import '../../../core/db/dao/sale_dao.dart';
+import '../../../core/errors/failures.dart';
 import '../domain/payment_method.dart';
 import '../domain/sale.dart';
 import '../domain/sale_repository.dart';
@@ -87,10 +88,20 @@ class DriftSaleRepository implements SaleRepository {
   Future<int> saleCount() => _dao.saleCount();
 
   Sale _toSale(db.Sale row, {int itemCount = 0}) {
+    final PaymentMethod paymentMethod;
+    try {
+      paymentMethod = PaymentMethod.fromStorage(row.paymentMethod);
+    } catch (_) {
+      // A corrupt payment code must surface as a data failure the UI can
+      // display — never a raw ArgumentError escaping to the screens.
+      throw DatabaseFailure(
+        message: 'Sale #${row.id} has an unrecognized payment method.',
+      );
+    }
     return Sale(
       id: row.id,
       transactionNumber: row.transactionNumber,
-      paymentMethod: PaymentMethod.fromStorage(row.paymentMethod),
+      paymentMethod: paymentMethod,
       subtotalPaise: row.subtotalPaise,
       totalPaise: row.totalPaise,
       createdAt: row.createdAt,

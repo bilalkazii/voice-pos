@@ -1,15 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/today.dart';
 import '../../checkout/domain/sale.dart';
 import '../../checkout/presentation/checkout_providers.dart';
 import '../domain/daily_sales_summary.dart';
 import '../domain/history_day_filter.dart';
-
-/// Start of the current local day — the "Today" filter boundary.
-DateTime startOfToday() {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-}
 
 /// Debounced transaction-number search text (the History search field).
 class HistorySearchQuery extends Notifier<String> {
@@ -43,13 +38,16 @@ final historyDayFilterProvider =
 
 /// The bounded, reactive history list combining the search text and the
 /// day filter. Newest-first, capped at 50, item counts included; updates
-/// live after checkout.
+/// live after checkout. The day boundary follows [todayStartProvider], so
+/// an app left open across midnight re-queries instead of showing
+/// yesterday's "Today".
 final historySalesProvider = StreamProvider<List<Sale>>((ref) {
   final repository = ref.watch(saleRepositoryProvider);
   final query = ref.watch(historySearchQueryProvider);
   final filter = ref.watch(historyDayFilterProvider);
+  final todayStart = ref.watch(todayStartProvider);
   return repository.watchSalesWithCount(
-    after: filter == HistoryDayFilter.today ? startOfToday() : null,
+    after: filter == HistoryDayFilter.today ? todayStart : null,
     transactionSearch: query,
   );
 });
@@ -58,8 +56,9 @@ final historySalesProvider = StreamProvider<List<Sale>>((ref) {
 /// source for the summary card. Reactive so the summary updates after a
 /// new checkout.
 final todaySalesProvider = StreamProvider<List<Sale>>((ref) {
+  final todayStart = ref.watch(todayStartProvider);
   return ref.watch(saleRepositoryProvider).watchSalesWithCount(
-        after: startOfToday(),
+        after: todayStart,
       );
 });
 

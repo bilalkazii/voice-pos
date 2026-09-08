@@ -21,9 +21,10 @@ final checkoutServiceProvider = Provider<CheckoutService>(
 );
 
 /// Read path for receipt/payment-complete screens: the committed sale,
-/// never the (cleared) cart.
+/// never the (cleared) cart. autoDispose so per-sale snapshots are not
+/// retained for the application lifetime.
 final completedSaleProvider =
-    FutureProvider.family<CompletedSale?, int>((ref, saleId) {
+    FutureProvider.autoDispose.family<CompletedSale?, int>((ref, saleId) {
   return ref.watch(saleRepositoryProvider).getSaleWithItems(saleId);
 });
 

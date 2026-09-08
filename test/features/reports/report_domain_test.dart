@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voice_pos/core/utils/money.dart';
+import 'package:voice_pos/core/utils/today.dart';
 import 'package:voice_pos/features/reports/domain/report_date_range.dart';
 import 'package:voice_pos/features/reports/domain/report_summary.dart';
 
@@ -64,6 +65,38 @@ void main() {
       expect(Money.formatPaise(1000), '₹10.00');
       expect(Money.formatPaise(1050), '₹10.50');
       expect(Money.formatPaise(10025), '₹100.25');
+    });
+  });
+
+  group('ReportDateRange.rangeForDay (explicit midnight)', () {
+    final day = DateTime(2026, 9, 7);
+
+    test('today is [midnight, next midnight)', () {
+      expect(
+        ReportDateRange.today.rangeForDay(day),
+        (start: day, end: DateTime(2026, 9, 8)),
+      );
+    });
+
+    test('yesterday is [midnight - 1d, midnight)', () {
+      expect(
+        ReportDateRange.yesterday.rangeForDay(day),
+        (start: DateTime(2026, 9, 6), end: day),
+      );
+    });
+
+    test('last 7 days spans seven midnights ending tomorrow', () {
+      expect(
+        ReportDateRange.last7days.rangeForDay(day),
+        (start: DateTime(2026, 9, 1), end: DateTime(2026, 9, 8)),
+      );
+    });
+
+    test('matches rangeFor for the same instant', () {
+      final now = DateTime(2026, 9, 7, 15, 30);
+      for (final range in ReportDateRange.values) {
+        expect(range.rangeForDay(startOfToday(now)), range.rangeFor(now));
+      }
     });
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/today.dart';
 import '../../checkout/domain/sale.dart';
 import '../../checkout/presentation/checkout_providers.dart';
 import '../../products/domain/product.dart';
@@ -29,11 +30,12 @@ final reportDateRangeProvider =
   ReportDateRangeNotifier.new,
 );
 
-/// Resolves the selected [ReportDateRange] against the local clock.
+/// Resolves the selected [ReportDateRange] against the live start-of-day.
+/// Follows [todayStartProvider], so a dashboard left open across midnight
+/// re-resolves instead of showing yesterday's "Today".
 final reportRangeProvider = Provider<({DateTime start, DateTime end})>((ref) {
-  return ref
-      .watch(reportDateRangeProvider)
-      .rangeFor(DateTime.now());
+  final todayStart = ref.watch(todayStartProvider);
+  return ref.watch(reportDateRangeProvider).rangeForDay(todayStart);
 });
 
 /// Reactive aggregate summary (total + count + avg) for the current range.
