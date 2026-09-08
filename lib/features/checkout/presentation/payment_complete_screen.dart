@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/printing/domain/receipt_mapper.dart';
+import '../../../core/printing/presentation/print_controller.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/money.dart';
 import '../../settings/presentation/settings_providers.dart';
@@ -135,6 +137,11 @@ class _UnknownSale extends StatelessWidget {
 /// On-screen receipt for a committed sale. All data comes from the stored
 /// Sale/SaleItems snapshots — product renames or reprices after the sale
 /// never change this view.
+///
+/// The PRINT RECEIPT button routes the committed sale through the
+/// [PrintController] → [PrinterService] boundary. Phase 8A has no hardware
+/// adapter, so it honestly reports "Printer not configured" — attempting
+/// (and retrying) a print can never alter the committed sale.
 class ReceiptScreen extends ConsumerWidget {
   const ReceiptScreen({super.key, required this.saleId});
 
@@ -145,6 +152,23 @@ class ReceiptScreen extends ConsumerWidget {
     final saleAsync = ref.watch(completedSaleProvider(saleId));
     final theme = Theme.of(context);
 
+    ref.listen(printControllerProvider, (previous, next) {
+      // Report every completed attempt, including repeats of an identical
+      // result (the loading intermediate makes each attempt a transition).
+      final result = next.maybeWhen(data: (r) => r, orElse: () => null);
+      if (previous is AsyncLoading &&
+          result != null &&
+          context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              result.message.isEmpty ? 'Printed' : result.message,
+            ),
+          ),
+        );
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(title: const Text('Receipt')),
       body: saleAsync.when(
@@ -153,6 +177,8 @@ class ReceiptScreen extends ConsumerWidget {
             return const Center(child: Text('Receipt not found.'));
           }
           final sale = completed.sale;
+          final printing =
+              ref.watch(printControllerProvider).isLoading;
           return ListView(
             padding: const EdgeInsets.all(AppTokens.screenPadding),
             children: [
@@ -239,6 +265,28 @@ class ReceiptScreen extends ConsumerWidget {
                 onPressed: () => context.go('/'),
                 icon: const Icon(Icons.add_shopping_cart),
                 label: const Text('NEW SALE'),
+              ),
+              const SizedBox(height: AppTokens.space12),
+              OutlinedButton.icon(
+                onPressed: printing
+                    ? null
+                    : () {
+                        final receipt = ReceiptMapper.toReceiptData(
+                          completed,
+                          storeName: ref.read(storeNameProvider),
+                        );
+                        ref
+                            .read(printControllerProvider.notifier)
+                            .printReceipt(receipt);
+                      },
+                icon: printing
+                    ? const SizedBox(
+                        width: AppTokens.iconSmall,
+                        height: AppTokens.iconSmall,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.print_outlined),
+                label: Text(printing ? 'PRINTING…' : 'PRINT RECEIPT'),
               ),
             ],
           );
