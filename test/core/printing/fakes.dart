@@ -36,6 +36,8 @@ class FakeBluetoothTransport implements BluetoothTransport {
     this.writeResults = const [],
     this.hangConnect = false,
     this.hangWrite = false,
+    this.hangPermission = false,
+    this.hangEnabled = false,
     this.throwOnWrite = false,
   });
 
@@ -46,6 +48,8 @@ class FakeBluetoothTransport implements BluetoothTransport {
   List<bool> writeResults;
   bool hangConnect;
   bool hangWrite;
+  bool hangPermission;
+  bool hangEnabled;
   bool throwOnWrite;
 
   int permissionRequests = 0;
@@ -55,10 +59,16 @@ class FakeBluetoothTransport implements BluetoothTransport {
   String? lastConnectedAddress;
 
   @override
-  Future<bool> isBluetoothEnabled() async => bluetoothOn;
+  Future<bool> isBluetoothEnabled() async {
+    if (hangEnabled) return Completer<bool>().future;
+    return bluetoothOn;
+  }
 
   @override
-  Future<bool> hasPermission() async => permissionGranted;
+  Future<bool> hasPermission() async {
+    if (hangPermission) return Completer<bool>().future;
+    return permissionGranted;
+  }
 
   @override
   Future<bool> requestPermission() async {

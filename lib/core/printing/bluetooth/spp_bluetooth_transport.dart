@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
@@ -8,29 +10,34 @@ import 'bluetooth_transport.dart';
 /// listing needs no location permission).
 ///
 /// Construction performs zero platform work — safe to build in tests and
-/// widget trees; every method guards platform throws and degrades to
-/// `false`/empty. Runtime permission is requested through
-/// `permission_handler` only when the user starts setup or printing.
+/// widget trees; every method guards platform throws AND platform hangs
+/// (found hanging on some API 37 devices) by bounding each quick plugin
+/// call with [quickCallTimeout], degrading to `false`/empty. Runtime
+/// permission is requested through `permission_handler` only when the user
+/// starts setup or printing.
 class SppBluetoothTransport implements BluetoothTransport {
-  const SppBluetoothTransport();
+  const SppBluetoothTransport({this.quickCallTimeout = const Duration(seconds: 5)});
 
-  @override
-  Future<bool> isBluetoothEnabled() async {
+  /// Bound for the cheap plugin queries. The platform channel has been
+  /// observed to never return on some devices; without this the printer
+  /// setup sheet would spin forever.
+  final Duration quickCallTimeout;
+
+  Future<bool> _bounded(Future<bool> Function() action) async {
     try {
-      return await PrintBluetoothThermal.bluetoothEnabled;
+      return await action().timeout(quickCallTimeout);
     } catch (_) {
       return false;
     }
   }
 
   @override
-  Future<bool> hasPermission() async {
-    try {
-      return await PrintBluetoothThermal.isPermissionBluetoothGranted;
-    } catch (_) {
-      return false;
-    }
-  }
+  Future<bool> isBluetoothEnabled() =>
+      _bounded(() => PrintBluetoothThermal.bluetoothEnabled);
+
+  @override
+  Future<bool> hasPermission() =>
+      _bounded(() => PrintBluetoothThermal.isPermissionBluetoothGranted);
 
   @override
   Future<bool> requestPermission() async {
@@ -47,7 +54,8 @@ class SppBluetoothTransport implements BluetoothTransport {
   @override
   Future<List<BluetoothPrinterDevice>> pairedDevices() async {
     try {
-      final bonded = await PrintBluetoothThermal.pairedBluetooths;
+      final bonded = await PrintBluetoothThermal.pairedBluetooths
+          .timeout(quickCallTimeout);
       return [
         for (final device in bonded)
           if (device.macAdress.trim().isNotEmpty)

@@ -172,6 +172,41 @@ void main() {
       expect(transport.disconnects, greaterThanOrEqualTo(0));
     });
 
+    test('hanging permission check resolves to unavailable, not forever',
+        () async {
+      // Regression (Phase 10): the platform permission query was observed
+      // to never return on some API 37 devices, leaving the setup sheet
+      // and print attempts stuck. The service must bound the check.
+      final settings = await openSettingsRepo();
+      await settings.setPrinterSelection(id: testAddress, name: 'T-58');
+      final transport = FakeBluetoothTransport(
+        hangPermission: true,
+        permissionGranted: false,
+      );
+      final service =
+          adapter(settings: settings, transport: transport);
+
+      final result = await service.printReceipt(sampleReceipt());
+
+      expect(result, isA<PrintUnavailable>());
+      expect(transport.permissionRequests, 1);
+      expect(transport.connects, 0);
+    });
+
+    test('hanging availability check resolves to unavailable, not forever',
+        () async {
+      final settings = await openSettingsRepo();
+      await settings.setPrinterSelection(id: testAddress, name: 'T-58');
+      final transport = FakeBluetoothTransport(hangEnabled: true);
+      final service =
+          adapter(settings: settings, transport: transport);
+
+      final result = await service.printReceipt(sampleReceipt());
+
+      expect(result, isA<PrintUnavailable>());
+      expect(transport.connects, 0);
+    });
+
     test('write failure returns failed and still disconnects', () async {
       final settings = await openSettingsRepo();
       await settings.setPrinterSelection(id: testAddress, name: 'T-58');

@@ -21,6 +21,7 @@ class BluetoothPrinterService implements PrinterService {
     required this.settings,
     required this.transport,
     this.encoder = const EscPosEncoder(),
+    this.checkTimeout = const Duration(seconds: 5),
     this.connectTimeout = const Duration(seconds: 15),
     this.writeTimeout = const Duration(seconds: 20),
   });
@@ -28,6 +29,10 @@ class BluetoothPrinterService implements PrinterService {
   final SettingsRepository settings;
   final BluetoothTransport transport;
   final EscPosEncoder encoder;
+
+  /// Bound for the cheap precondition queries (permission/availability) —
+  /// the platform channel has been observed to hang on some devices.
+  final Duration checkTimeout;
   final Duration connectTimeout;
   final Duration writeTimeout;
 
@@ -40,13 +45,19 @@ class BluetoothPrinterService implements PrinterService {
     if (address == null) {
       return const PrintUnavailable('Printer not configured');
     }
-    if (!await transport.hasPermission()) {
+    final bool permitted = await _guard(
+      () => transport.hasPermission().timeout(checkTimeout),
+    );
+    if (!permitted) {
       final granted = await transport.requestPermission();
       if (!granted) {
         return const PrintUnavailable('Bluetooth permission denied');
       }
     }
-    if (!await transport.isBluetoothEnabled()) {
+    final bool enabled = await _guard(
+      () => transport.isBluetoothEnabled().timeout(checkTimeout),
+    );
+    if (!enabled) {
       return const PrintUnavailable('Bluetooth is turned off');
     }
 
