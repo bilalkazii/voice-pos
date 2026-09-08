@@ -44,5 +44,14 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Release signing material — never commit keystores or passwords.
+# Keystore files live outside the repository; android/key.properties
+# points at them (see android/key.properties.example).
+key.properties
+*.jks
+*.keystore
+*.keystore.id
+*.mobileprovision
+
 # Widget Preview related
 .widget_preview/

@@ -1,0 +1,14 @@
+# Template for android/key.properties — copy to android/key.properties and
+# fill in real values. key.properties is gitignored; the keystore file itself
+# MUST live OUTSIDE this repository (never in Git, never in android/app).
+#
+# NOTE: modern keystores are PKCS12, which requires storePassword and
+# keyPassword to be the SAME value.
+#
+# PRODUCTION keys only. A test/CI keystore may be used to validate the build
+# pipeline but its artifacts must never be published.
+
+storeFile=C:\\path\\to\\your\\production\\keystore.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_STORE_PASSWORD
