@@ -3,8 +3,10 @@ import 'package:drift/drift.dart';
 import 'connection.dart';
 import 'dao/product_dao.dart';
 import 'dao/sale_dao.dart';
+import 'dao/settings_dao.dart';
 import 'tables/product_tables.dart';
 import 'tables/sale_tables.dart';
+import 'tables/settings_tables.dart';
 
 part 'app_database.g.dart';
 
@@ -13,17 +15,22 @@ part 'app_database.g.dart';
 /// v1: products (+ case-insensitive uniqueness indexes).
 /// v2: adds sales + sale_items for cash checkout (non-destructive upgrade;
 /// existing products are preserved).
+/// v3: adds app_settings key/value store (non-destructive; products and
+/// sales are preserved, settings start at stable defaults).
 ///
 /// Migrations: [migration] creates the full current schema for fresh
 /// installs; [onUpgrade] steps existing databases forward version by
 /// version — never destructive recreation during normal upgrades.
-@DriftDatabase(tables: [Products, Sales, SaleItems], daos: [ProductDao, SaleDao])
+@DriftDatabase(
+  tables: [Products, Sales, SaleItems, AppSettings],
+  daos: [ProductDao, SaleDao, SettingsDao],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
       : super(executor ?? openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -36,6 +43,9 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(sales);
             await m.createTable(saleItems);
             await _createSaleIndexes(m.database);
+          }
+          if (from < 3) {
+            await m.createTable(appSettings);
           }
         },
         beforeOpen: (details) async {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/money.dart';
+import '../../settings/presentation/settings_providers.dart';
 import '../domain/product.dart';
 import 'products_providers.dart';
 
@@ -29,6 +30,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   late final TextEditingController _threshold;
   bool _saving = false;
 
+  /// Tracks manual edits so the asynchronously-loaded Settings default
+  /// fills the field once, but never overwrites what the cashier typed.
+  bool _thresholdTouched = false;
+
   bool get _editing => widget.product != null;
 
   @override
@@ -46,8 +51,14 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           : _paiseToInput(p!.costPricePaise!),
     );
     _stock = TextEditingController(text: p == null ? '0' : '${p.stockQty}');
+    // New products start from the configured Settings default (whatever
+    // has loaded so far; refreshed in build once settings arrive).
+    // Existing products keep their own threshold (never overwritten).
     _threshold = TextEditingController(
-      text: p == null ? '5' : '${p.lowStockThreshold}',
+      text:
+          p == null
+              ? ref.read(defaultLowStockThresholdProvider).toString()
+              : '${p.lowStockThreshold}',
     );
   }
 
@@ -71,6 +82,14 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Once the persisted default arrives, fill it in for new products —
+    // but never overwrite what the cashier already typed.
+    if (!_editing && !_thresholdTouched) {
+      final loaded = ref.watch(defaultLowStockThresholdProvider).toString();
+      if (_threshold.text != loaded) {
+        _threshold.text = loaded;
+      }
+    }
     return Scaffold(
       appBar: AppBar(title: Text(_editing ? 'Edit Product' : 'Add Product')),
       body: Form(
@@ -167,6 +186,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     ),
                     validator: (v) =>
                         _validateNonNegativeInt(v, 'Threshold'),
+                    onChanged: (_) => _thresholdTouched = true,
                   ),
                 ),
               ],

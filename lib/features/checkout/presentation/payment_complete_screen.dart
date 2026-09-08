@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/constants.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/money.dart';
+import '../../settings/presentation/settings_providers.dart';
 import 'checkout_providers.dart';
 
 /// Success screen shown exactly once per committed sale. Renders the
@@ -163,7 +163,7 @@ class ReceiptScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        AppConstants.defaultStoreName,
+                        ref.watch(storeNameProvider),
                         style: theme.textTheme.titleMedium,
                         textAlign: TextAlign.center,
                       ),

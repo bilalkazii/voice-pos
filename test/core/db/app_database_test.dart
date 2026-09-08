@@ -32,11 +32,11 @@ Future<int> insertProduct(
 
 void main() {
   group('database opens', () {
-    test('schema version is 2 and products table exists', () async {
+    test('schema version is 3 and products table exists', () async {
       final db = openTestDb();
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 2);
+      expect(db.schemaVersion, 3);
       final tables = await db.customSelect(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'products'",
       ).get();

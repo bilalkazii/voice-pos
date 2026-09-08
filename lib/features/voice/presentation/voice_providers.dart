@@ -8,6 +8,7 @@ import '../../cart/presentation/cart_providers.dart';
 import '../../products/domain/product.dart';
 import '../../products/domain/product_repository.dart';
 import '../../products/presentation/products_providers.dart';
+import '../../settings/presentation/settings_providers.dart';
 import '../data/stt_speech_service.dart';
 import '../data/tts_feedback_service.dart';
 import '../domain/command_parser.dart';
@@ -26,7 +27,13 @@ final speechServiceProvider = Provider<SpeechToTextService>(
 
 final voiceFeedbackProvider = Provider<VoiceFeedbackService>(
   (ref) {
-    final service = TtsFeedbackService();
+    // Gated by the persisted Settings toggle (default ON while loading).
+    // STT is unaffected — this suppresses spoken confirmations only.
+    final enabled = ref.watch(settingsProvider).maybeWhen(
+          data: (s) => s.voiceFeedbackEnabled,
+          orElse: () => true,
+        );
+    final service = TtsFeedbackService(enabled: enabled);
     ref.onDispose(() => unawaited(service.stop()));
     return service;
   },

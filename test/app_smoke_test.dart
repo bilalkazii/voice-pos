@@ -62,7 +62,11 @@ void main() {
 
     await tester.tap(find.text('Settings').first);
     await tester.pumpAndSettle();
-    expect(find.text('Settings arrive in a later phase.'), findsOneWidget);
+    await pumpStreams(tester);
+    // Settings is now the real Phase 7 screen (empty store).
+    expect(find.text('Settings'), findsWidgets);
+    expect(find.text('Store Name'), findsOneWidget);
+    expect(find.text('Voice Feedback'), findsOneWidget);
 
     // Back to the cart default.
     await tester.tap(find.text('Bill').first);

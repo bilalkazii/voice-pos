@@ -72,10 +72,10 @@ void main() {
       expect(tableSql.read<String>('sql'), contains('UNIQUE'));
     });
 
-    test('schema version is 2', () async {
+    test('schema version is 3', () async {
       final db = openTestDb();
       addTearDown(db.close);
-      expect(db.schemaVersion, 2);
+      expect(db.schemaVersion, 3);
     });
 
     test('recent sales ordering and sale count', () async {
@@ -258,7 +258,8 @@ void main() {
       expect(items.first.productName, 'Pepsi 500ml');
 
       final version = await db.customSelect('PRAGMA user_version').getSingle();
-      expect(version.read<int>('user_version'), 2);
+      // A v1 file migrates through v2 (sales) to the current v3.
+      expect(version.read<int>('user_version'), 3);
     });
   });
 }
