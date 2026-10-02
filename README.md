@@ -138,7 +138,7 @@ component.
 Requires **Flutter** with Dart `^3.13.1`.
 
 ```bash
-git clone https://github.com/<owner>/voice-pos.git
+git clone https://github.com/bilalkazii/voice-pos.git
 cd voice-pos
 flutter pub get
 ```
