@@ -14,6 +14,7 @@ import 'package:voice_pos/features/products/data/product_repository_impl.dart';
 import 'package:voice_pos/features/settings/data/settings_repository_impl.dart';
 import 'package:voice_pos/features/settings/domain/app_settings.dart';
 import 'package:voice_pos/features/settings/domain/settings_repository.dart';
+import 'package:voice_pos/features/voice/domain/voice_language.dart';
 
 import 'fakes.dart';
 
@@ -52,6 +53,10 @@ class ThrowingSettingsRepository implements SettingsRepository {
 
   @override
   Future<void> setVoiceFeedbackEnabled(bool enabled) =>
+      throw StateError('db gone');
+
+  @override
+  Future<void> setVoiceLanguage(VoiceLanguage language) =>
       throw StateError('db gone');
 
   @override

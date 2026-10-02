@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/db/dao/settings_dao.dart';
 import '../../../core/errors/failures.dart';
+import '../../voice/domain/voice_language.dart';
 import '../domain/app_settings.dart';
 import '../domain/settings_repository.dart';
 
@@ -17,6 +18,7 @@ class DriftSettingsRepository implements SettingsRepository {
 
   static const String keyStoreName = 'store_name';
   static const String keyVoiceFeedback = 'voice_feedback_enabled';
+  static const String keyVoiceLanguage = 'voice_language';
   static const String keyDefaultThreshold = 'default_low_stock_threshold';
 
   /// Single serialized printer selection (`{"address":…,"name":…}`).
@@ -54,6 +56,11 @@ class DriftSettingsRepository implements SettingsRepository {
   @override
   Future<void> setVoiceFeedbackEnabled(bool enabled) {
     return _dao.setValue(keyVoiceFeedback, enabled ? '1' : '0');
+  }
+
+  @override
+  Future<void> setVoiceLanguage(VoiceLanguage language) {
+    return _dao.setValue(keyVoiceLanguage, language.storageKey);
   }
 
   @override
@@ -110,6 +117,8 @@ class DriftSettingsRepository implements SettingsRepository {
           ? AppSettings.defaults.storeName
           : values[keyStoreName]!.trim(),
       voiceFeedbackEnabled: (values[keyVoiceFeedback] ?? '1') != '0',
+      voiceLanguage:
+          VoiceLanguage.fromStorageKey(values[keyVoiceLanguage]),
       defaultLowStockThreshold:
           threshold == null || threshold < 0
               ? AppSettings.defaults.defaultLowStockThreshold

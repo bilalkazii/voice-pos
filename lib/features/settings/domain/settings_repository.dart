@@ -1,4 +1,5 @@
 import 'app_settings.dart';
+import '../../voice/domain/voice_language.dart';
 
 /// Settings persistence contract. Exposes the domain model only — never
 /// Drift rows. Partial updates write a single key each; unwritten keys
@@ -15,6 +16,8 @@ abstract class SettingsRepository {
   Future<void> saveStoreName(String name);
 
   Future<void> setVoiceFeedbackEnabled(bool enabled);
+
+  Future<void> setVoiceLanguage(VoiceLanguage language);
 
   /// Throws [ValidationFailure] for negative values.
   Future<void> setDefaultLowStockThreshold(int threshold);

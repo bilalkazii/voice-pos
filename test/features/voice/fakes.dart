@@ -17,6 +17,9 @@ class FakeSpeechService implements SpeechToTextService {
   int listenCalls = 0;
   int stopCalls = 0;
 
+  /// Records the locale asked for on the last [listenOnceFor] call.
+  String? lastRequestedLocale;
+
   @override
   Future<bool> initialize() async => available && permissionGranted;
 
@@ -26,6 +29,13 @@ class FakeSpeechService implements SpeechToTextService {
   @override
   Future<String?> listenOnce() async {
     listenCalls++;
+    return transcript;
+  }
+
+  @override
+  Future<String?> listenOnceFor({String? preferredLocaleId}) async {
+    listenCalls++;
+    lastRequestedLocale = preferredLocaleId;
     return transcript;
   }
 

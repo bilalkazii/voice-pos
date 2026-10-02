@@ -15,6 +15,8 @@ import '../domain/command_parser.dart';
 import '../domain/product_matcher.dart';
 import '../domain/speech_services.dart';
 import '../domain/voice_command.dart';
+import '../domain/voice_feedback_text.dart';
+import '../domain/voice_language.dart';
 import '../domain/voice_state.dart';
 
 final speechServiceProvider = Provider<SpeechToTextService>(
@@ -25,6 +27,12 @@ final speechServiceProvider = Provider<SpeechToTextService>(
   },
 );
 
+/// The selected voice command language. Gated by the persisted Settings
+/// toggle (TTS stays optional — STT and parsing proceed regardless).
+final currentVoiceLanguageProvider = Provider<VoiceLanguage>((ref) {
+  return ref.watch(voiceLanguageProvider);
+});
+
 final voiceFeedbackProvider = Provider<VoiceFeedbackService>(
   (ref) {
     // Gated by the persisted Settings toggle (default ON while loading).
@@ -33,7 +41,8 @@ final voiceFeedbackProvider = Provider<VoiceFeedbackService>(
           data: (s) => s.voiceFeedbackEnabled,
           orElse: () => true,
         );
-    final service = TtsFeedbackService(enabled: enabled);
+    final language = ref.watch(currentVoiceLanguageProvider);
+    final service = TtsFeedbackService(enabled: enabled, language: language);
     ref.onDispose(() => unawaited(service.stop()));
     return service;
   },
@@ -58,6 +67,9 @@ class VoiceController extends Notifier<VoiceState> {
   VoiceFeedbackService get _feedback => ref.read(voiceFeedbackProvider);
   ProductRepository get _products => ref.read(productRepositoryProvider);
 
+  VoiceLanguage get _language => ref.read(currentVoiceLanguageProvider);
+  VoiceFeedbackText get _feedbackText => VoiceFeedbackText(_language);
+
   /// Starts one voice command. Concurrent taps while listening/processing
   /// are ignored; any other state (including a pending clarification) is
   /// replaced by the new command.
@@ -72,21 +84,24 @@ class VoiceController extends Notifier<VoiceState> {
     if (!ready) {
       final granted = await _speech.hasPermission;
       if (!granted) {
-        _fail('Microphone permission is needed for voice input.');
+        _fail(_feedbackText.micPermission());
       } else {
-        _fail('Speech recognition is unavailable on this device.');
+        _fail(_feedbackText.sttUnavailable());
       }
       return;
     }
 
-    final transcript = await _speech.listenOnce();
+    // Use the selected locale where supported; fall back gracefully inside
+    // the STT implementation when the device lacks it.
+    final transcript = await _speech
+        .listenOnceFor(preferredLocaleId: _language.sttLocaleId);
     final text = (transcript ?? '').trim();
     if (text.isEmpty) {
-      _fail("Didn't catch that. Try again.");
+      _fail(_feedbackText.noSpeech());
       return;
     }
     state = VoiceState(status: VoiceStatus.processing, transcript: text);
-    await _execute(_parser.parse(text));
+    await _execute(_parser.parse(text, language: _language));
   }
 
   /// Cancels an open microphone and returns to idle.
@@ -108,7 +123,7 @@ class VoiceController extends Notifier<VoiceState> {
     }
     state = state.copyWith(status: VoiceStatus.processing, clearPending: true);
     ref.read(cartProvider.notifier).clearCart();
-    _succeed('Cart cleared.');
+    _succeed(_feedbackText.cartCleared());
   }
 
   /// Drops a pending clarification or confirmation.
@@ -136,7 +151,7 @@ class VoiceController extends Notifier<VoiceState> {
     if (command is CheckoutCommand) return _executeCheckout();
     if (command is ClearCartCommand) return _executeClear();
     if (command is UnknownCommand) {
-      _fail("Sorry, I didn't understand that.");
+      _fail(_feedbackText.unknown());
       return;
     }
 
@@ -144,7 +159,7 @@ class VoiceController extends Notifier<VoiceState> {
     try {
       catalog = await _products.getAllActive();
     } catch (_) {
-      _fail('Could not load products. Try again.');
+      _fail(_feedbackText.productLoadError());
       return;
     }
     final match = _matcher.match(_spokenName(command), catalog);
@@ -152,7 +167,7 @@ class VoiceController extends Notifier<VoiceState> {
       case ProductMatchUnique(:final product):
         await _executeResolved(command, product);
       case ProductMatchAmbiguous(:final candidates):
-        final message = 'Which ${_spokenName(command)} do you mean?';
+        final message = _feedbackText.whichProduct(_spokenName(command));
         state = state.copyWith(
           status: VoiceStatus.clarificationRequired,
           message: message,
@@ -161,7 +176,7 @@ class VoiceController extends Notifier<VoiceState> {
         );
         _say(message);
       case ProductMatchNone():
-        _fail('Product not found: ${_spokenName(command)}.');
+        _fail(_feedbackText.productNotFound(_spokenName(command)));
     }
   }
 
@@ -172,15 +187,13 @@ class VoiceController extends Notifier<VoiceState> {
         final failure = cart.addProduct(product, quantity: quantity);
         if (failure != null) {
           _fail(failure.message);
-        } else if (quantity == 1) {
-          _succeed('Added ${product.name}.');
         } else {
-          _succeed('Added $quantity ${product.name}.');
+          _succeed(_feedbackText.added(product.name, quantity: quantity));
         }
       case RemoveProductCommand(:final quantity):
         final line = ref.read(cartProvider).getItem(product.id);
         if (line == null) {
-          _fail('"${product.name}" is not in the cart.');
+          _fail(_feedbackText.notInCart(product.name));
           return;
         }
         final Failure? failure;
@@ -192,7 +205,7 @@ class VoiceController extends Notifier<VoiceState> {
         if (failure != null) {
           _fail(failure.message);
         } else {
-          _succeed('Removed ${product.name}.');
+          _succeed(_feedbackText.removed(product.name));
         }
       case IncreaseProductCommand(:final quantity):
         _mutateLine(
@@ -211,13 +224,16 @@ class VoiceController extends Notifier<VoiceState> {
       case SetQuantityCommand(:final quantity):
         _mutateLine(product, cart.setQuantity(product.id, quantity));
       case PriceQueryCommand():
-        _succeed('"${product.name}" costs ${Money.formatPaise(product.sellingPricePaise)}.');
+        _succeed(_feedbackText.price(
+          product.name,
+          Money.formatPaise(product.sellingPricePaise),
+        ));
       case StockQueryCommand():
-        _succeed('"${product.name}" has ${product.stockQty} in stock.');
+        _succeed(_feedbackText.stock(product.name, product.stockQty));
       case ClearCartCommand():
       case CheckoutCommand():
       case UnknownCommand():
-        _fail("Sorry, I didn't understand that.");
+        _fail(_feedbackText.unknown());
     }
   }
 
@@ -248,36 +264,36 @@ class VoiceController extends Notifier<VoiceState> {
     }
     final line = ref.read(cartProvider).getItem(product.id);
     if (line == null) {
-      _succeed('Removed ${product.name}.');
+      _succeed(_feedbackText.removed(product.name));
     } else {
-      _succeed('${product.name} quantity ${line.quantity}.');
+      _succeed(_feedbackText.quantityNow(product.name, line.quantity));
     }
   }
 
   void _executeClear() {
     if (ref.read(cartProvider).isEmpty) {
-      _fail('The cart is already empty.');
+      _fail(_feedbackText.cartEmptyWarning());
       return;
     }
     state = state.copyWith(
       status: VoiceStatus.confirmationRequired,
-      message: 'Clear the current bill?',
+      message: _feedbackText.clearConfirmMessage(),
       pending: const ClearCartCommand(),
     );
   }
 
   void _executeCheckout() {
     if (ref.read(cartProvider).isEmpty) {
-      _fail('The cart is empty. Add products first.');
+      _fail(_feedbackText.checkoutEmptyWarning());
       return;
     }
     state = state.copyWith(
       status: VoiceStatus.success,
-      message: 'Opening checkout…',
+      message: _feedbackText.checkoutOpening(),
       clearPending: true,
       checkoutRequestId: state.checkoutRequestId + 1,
     );
-    _say('Opening checkout.');
+    _say(_feedbackText.checkoutOpening());
   }
 
   String _spokenName(VoiceCommand command) {

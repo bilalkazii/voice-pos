@@ -1,5 +1,6 @@
 import '../../../core/constants.dart';
 import '../../../core/errors/failures.dart';
+import '../../voice/domain/voice_language.dart';
 
 /// Immutable app settings. Pure Dart — no Flutter, no Drift.
 ///
@@ -11,6 +12,7 @@ class AppSettings {
   const AppSettings({
     required this.storeName,
     required this.voiceFeedbackEnabled,
+    required this.voiceLanguage,
     required this.defaultLowStockThreshold,
     required this.selectedPrinterId,
     required this.selectedPrinterName,
@@ -21,6 +23,7 @@ class AppSettings {
   static const AppSettings defaults = AppSettings(
     storeName: AppConstants.defaultStoreName,
     voiceFeedbackEnabled: true,
+    voiceLanguage: VoiceLanguage.english,
     defaultLowStockThreshold: 5,
     selectedPrinterId: null,
     selectedPrinterName: null,
@@ -28,6 +31,7 @@ class AppSettings {
 
   final String storeName;
   final bool voiceFeedbackEnabled;
+  final VoiceLanguage voiceLanguage;
   final int defaultLowStockThreshold;
   final String? selectedPrinterId;
   final String? selectedPrinterName;
@@ -37,6 +41,7 @@ class AppSettings {
   AppSettings copyWith({
     String? storeName,
     bool? voiceFeedbackEnabled,
+    VoiceLanguage? voiceLanguage,
     int? defaultLowStockThreshold,
     String? selectedPrinterId,
     String? selectedPrinterName,
@@ -45,6 +50,7 @@ class AppSettings {
     return AppSettings(
       storeName: storeName ?? this.storeName,
       voiceFeedbackEnabled: voiceFeedbackEnabled ?? this.voiceFeedbackEnabled,
+      voiceLanguage: voiceLanguage ?? this.voiceLanguage,
       defaultLowStockThreshold:
           defaultLowStockThreshold ?? this.defaultLowStockThreshold,
       selectedPrinterId:
@@ -90,6 +96,7 @@ class AppSettings {
       other is AppSettings &&
           storeName == other.storeName &&
           voiceFeedbackEnabled == other.voiceFeedbackEnabled &&
+          voiceLanguage == other.voiceLanguage &&
           defaultLowStockThreshold == other.defaultLowStockThreshold &&
           selectedPrinterId == other.selectedPrinterId &&
           selectedPrinterName == other.selectedPrinterName;
@@ -98,6 +105,7 @@ class AppSettings {
   int get hashCode => Object.hash(
         storeName,
         voiceFeedbackEnabled,
+        voiceLanguage,
         defaultLowStockThreshold,
         selectedPrinterId,
         selectedPrinterName,

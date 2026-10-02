@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../products/presentation/products_providers.dart';
+import '../../voice/domain/voice_language.dart';
 import '../data/settings_repository_impl.dart';
 import '../domain/app_settings.dart';
 import '../domain/settings_repository.dart';
@@ -40,6 +41,14 @@ final defaultLowStockThresholdProvider = Provider<int>((ref) {
       );
 });
 
+/// Selected voice command language (English default while loading).
+final voiceLanguageProvider = Provider<VoiceLanguage>((ref) {
+  return ref.watch(settingsProvider).maybeWhen(
+        data: (s) => s.voiceLanguage,
+        orElse: () => AppSettings.defaults.voiceLanguage,
+      );
+});
+
 /// Settings mutations. Each method guards against concurrent duplicate
 /// saves and returns the [Failure] to display (null on success); the
 /// [settingsProvider] stream updates the UI automatically.
@@ -74,6 +83,24 @@ class SettingsController extends Notifier<AsyncValue<void>> {
       await ref
           .read(settingsRepositoryProvider)
           .setVoiceFeedbackEnabled(enabled);
+      state = const AsyncData(null);
+      return null;
+    } on Failure catch (e) {
+      state = AsyncError(e, StackTrace.current);
+      return e;
+    } catch (_) {
+      const failure =
+          DatabaseFailure(message: 'Could not save settings.');
+      state = AsyncError(failure, StackTrace.current);
+      return failure;
+    }
+  }
+
+  Future<Failure?> setVoiceLanguage(VoiceLanguage language) async {
+    if (_busy) return null;
+    state = const AsyncLoading();
+    try {
+      await ref.read(settingsRepositoryProvider).setVoiceLanguage(language);
       state = const AsyncData(null);
       return null;
     } on Failure catch (e) {

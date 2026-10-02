@@ -8,6 +8,7 @@ import '../../../core/printing/domain/receipt_data.dart';
 import '../../../core/printing/presentation/print_controller.dart';
 import '../../../core/constants.dart';
 import '../../../core/theme/tokens.dart';
+import '../../voice/domain/voice_language.dart';
 import '../domain/app_settings.dart';
 import 'settings_providers.dart';
 
@@ -76,17 +77,34 @@ class _SettingsBody extends ConsumerWidget {
         _SectionTitle('Voice'),
         const SizedBox(height: AppTokens.space8),
         _SettingsCard(
-          child: SwitchListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.space12,
-              vertical: AppTokens.space4,
-            ),
-            secondary: const Icon(Icons.mic_outlined),
-            title: const Text('Voice Feedback'),
-            subtitle: const Text('Spoken confirmations for voice commands'),
-            value: settings.voiceFeedbackEnabled,
-            onChanged: (value) =>
-                _setVoiceFeedback(context, ref, value),
+          child: Column(
+            children: [
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppTokens.space12,
+                  vertical: AppTokens.space4,
+                ),
+                secondary: const Icon(Icons.mic_outlined),
+                title: const Text('Voice Feedback'),
+                subtitle:
+                    const Text('Spoken confirmations for voice commands'),
+                value: settings.voiceFeedbackEnabled,
+                onChanged: (value) =>
+                    _setVoiceFeedback(context, ref, value),
+              ),
+              const Divider(height: 1, indent: AppTokens.space12),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppTokens.space12,
+                  vertical: AppTokens.space4,
+                ),
+                leading: const Icon(Icons.translate_outlined),
+                title: const Text('Voice Language'),
+                subtitle: Text(settings.voiceLanguage.label),
+                trailing: const Icon(Icons.arrow_drop_down),
+                onTap: () => _pickVoiceLanguage(context, ref),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: AppTokens.space16),
@@ -171,6 +189,45 @@ class _SettingsBody extends ConsumerWidget {
         SnackBar(content: Text(failure.message)),
       );
     }
+  }
+
+  Future<void> _pickVoiceLanguage(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final chosen = await showDialog<VoiceLanguage>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Voice Language'),
+        content: RadioGroup<VoiceLanguage>(
+          groupValue: settings.voiceLanguage,
+          onChanged: (value) {
+            if (value != null) Navigator.of(context).pop(value);
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final language in VoiceLanguage.values)
+                RadioListTile<VoiceLanguage>(
+                  title: Text(language.label),
+                  value: language,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (chosen == null || !context.mounted) return;
+    final failure = await ref
+        .read(settingsControllerProvider.notifier)
+        .setVoiceLanguage(chosen);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(failure?.message ?? 'Voice language saved.'),
+      ),
+    );
   }
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voice_pos/core/errors/failures.dart';
 import 'package:voice_pos/features/settings/domain/app_settings.dart';
+import 'package:voice_pos/features/voice/domain/voice_language.dart';
 
 void main() {
   group('defaults', () {
@@ -10,6 +11,7 @@ void main() {
       expect(AppSettings.defaults.defaultLowStockThreshold, 5);
       expect(AppSettings.defaults.selectedPrinterId, isNull);
       expect(AppSettings.defaults.hasPrinterConfigured, isFalse);
+      expect(AppSettings.defaults.voiceLanguage, VoiceLanguage.english);
     });
   });
 
@@ -73,6 +75,7 @@ void main() {
       const withPrinter = AppSettings(
         storeName: 'Shop',
         voiceFeedbackEnabled: true,
+        voiceLanguage: VoiceLanguage.english,
         defaultLowStockThreshold: 5,
         selectedPrinterId: 'AA',
         selectedPrinterName: 'P',
@@ -80,6 +83,12 @@ void main() {
       final cleared = withPrinter.copyWith(clearPrinter: true);
       expect(cleared.selectedPrinterId, isNull);
       expect(cleared.selectedPrinterName, isNull);
+
+      final switched = base.copyWith(
+        voiceLanguage: VoiceLanguage.marathi,
+      );
+      expect(switched.voiceLanguage, VoiceLanguage.marathi);
+      expect(switched.voiceLanguage, isNot(base.voiceLanguage));
     });
   });
 }

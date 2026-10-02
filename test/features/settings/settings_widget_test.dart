@@ -9,6 +9,7 @@ import 'package:voice_pos/features/settings/data/settings_repository_impl.dart';
 import 'package:voice_pos/features/settings/domain/app_settings.dart';
 import 'package:voice_pos/features/settings/domain/settings_repository.dart';
 import 'package:voice_pos/features/settings/presentation/settings_providers.dart';
+import 'package:voice_pos/features/voice/domain/voice_language.dart';
 
 import '../../test_utils.dart';
 
@@ -55,6 +56,10 @@ class _FailingSettingsRepository implements SettingsRepository {
   @override
   Future<void> setVoiceFeedbackEnabled(bool enabled) =>
       _real.setVoiceFeedbackEnabled(enabled);
+
+  @override
+  Future<void> setVoiceLanguage(VoiceLanguage language) =>
+      _real.setVoiceLanguage(language);
 
   @override
   Future<void> setDefaultLowStockThreshold(int threshold) =>

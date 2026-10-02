@@ -4,6 +4,7 @@
 *.pyc
 *.swp
 .DS_Store
+Thumbs.db
 .atom/
 .build/
 .buildlog/
@@ -32,6 +33,18 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+**/build/
+
+# Android / Gradle / iOS build output
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/.cxx/
+ios/build/
+ios/Pods/
+**/Flutter/ephemeral/
+**/GeneratedPluginRegistrant.*
 
 # Symbolication related
 app.*.symbols
@@ -52,6 +65,25 @@ key.properties
 *.keystore
 *.keystore.id
 *.mobileprovision
+*.p12
+*.pfx
+*.p8
+*.cer
+*.certSigningRequest
+
+# Environment and secrets — this app is offline-only and has no .env, but
+# ignore the pattern anyway so a future backend integration cannot leak one.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Archives
+*.zip
+*.apk
+*.aab
+*.ipa
 
 # Widget Preview related
 .widget_preview/

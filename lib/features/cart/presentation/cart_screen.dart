@@ -203,6 +203,8 @@ class CartScreen extends ConsumerWidget {
 
 /// Large push-to-talk button. One tap = one command; tapping while
 /// listening cancels. Processing disables the button to avoid races.
+/// Shows the active voice language so the cashier knows which locale will
+/// be used for the next interaction.
 class _VoiceButton extends ConsumerWidget {
   const _VoiceButton();
 
@@ -211,26 +213,41 @@ class _VoiceButton extends ConsumerWidget {
     final status = ref.watch(
       voiceControllerProvider.select((s) => s.status),
     );
+    final language = ref.watch(currentVoiceLanguageProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
     final listening = status == VoiceStatus.listening;
     final processing = status == VoiceStatus.processing;
-    return FilledButton.icon(
-      onPressed: processing
-          ? null
-          : listening
-              ? controller.cancelListening
-              : controller.startVoiceCommand,
-      icon: Icon(
-        listening ? Icons.stop : Icons.mic,
-        size: AppTokens.iconMedium,
-      ),
-      label: Text(
-        listening
-            ? 'LISTENING…'
-            : processing
-                ? 'PROCESSING…'
-                : 'SPEAK',
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          onPressed: processing
+              ? null
+              : listening
+                  ? controller.cancelListening
+                  : controller.startVoiceCommand,
+          icon: Icon(
+            listening ? Icons.stop : Icons.mic,
+            size: AppTokens.iconMedium,
+          ),
+          label: Text(
+            listening
+                ? 'LISTENING…'
+                : processing
+                    ? 'PROCESSING…'
+                    : 'SPEAK',
+          ),
+        ),
+        const SizedBox(height: AppTokens.space4),
+        Text(
+          'Voice: ${language.label}',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTokens.onSurfaceVariant,
+              ),
+        ),
+      ],
     );
   }
 }

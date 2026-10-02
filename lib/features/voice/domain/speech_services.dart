@@ -15,6 +15,12 @@ abstract class SpeechToTextService {
   /// must always complete (implementations guard with their own timeout).
   Future<String?> listenOnce();
 
+  /// Locale-aware pedestal of [listenOnce]: selects the best matching
+  /// supported STT locale for [preferredLocaleId] (falling back gracefully
+  /// to a generic Indian locale then the device default) before listening.
+  /// Returns null when nothing was recognized. Must never throw.
+  Future<String?> listenOnceFor({String? preferredLocaleId});
+
   /// Closes the mic early (user cancel). Must never throw.
   Future<void> stop();
 }
